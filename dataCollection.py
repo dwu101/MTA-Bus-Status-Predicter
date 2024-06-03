@@ -1,25 +1,81 @@
 import requests
 import csv
+import traceback
 from datetime import datetime
-from settings import MTAapiKey, allBusInfoAPI, allStopsAPI, weatherAPI, weatherAPIKey
+from settings import MTAapiKey, allBusInfoAPI, allStopsAPI, weatherAPI, weatherAPIKey, XRapidAPIHost, XRapidAPIKey
 from afterTime import afterTime
 from isWeekend import isWeekend
 from getCurrTime import getCurrTime
 
-#time, direction, isweekend, after 10, 12am-6am, passenger count, stop # of next stop on route, feelslike, visibility, windgust, precip, snow, conditions, late?
+# columns = ["time", "direction", "isweekend","after 10","12am-6am","passenger count","stop # of next stop on route", "feelslike(f)", "visibility(mi)", "windgust(mph)", "precip(in)", "uv", "humidity", "conditions", "late"]
 def dataCollection(filename):
     try: 
-        params = {'key': MTAapiKey}
+        headers = {
+            "X-RapidAPI-Key": XRapidAPIKey,
+            "X-RapidAPI-Host": XRapidAPIHost
+        }
+        q = {"q": "Brooklyn"}
 
-        allBusInfo = requests.get(allBusInfoAPI, params=params)
+        weather = requests.get(weatherAPI, headers=headers, params=q)
+        
+        if weather.status_code == 200:
+            weather = weather.json()['current']
+        else:
+            message = weather.json()
+            print(message)
+            raise Exception("Weather API did not work") #if this doesnt work then break the whole thing
+
+
+        weatherList = []
+
+        try:
+            weatherList.append(weather['feelslike_f'])
+        except Exception:
+            weatherList.append("")
+        
+        try:
+            weatherList.append(weather['vis_miles'])
+        except Exception:
+            weatherList.append("")
+        
+        try:
+            weatherList.append(weather['gust_mph'])
+        except Exception:
+            weatherList.append("")
+        
+        try:
+            weatherList.append(weather['precip_in'])
+        except Exception:
+            weatherList.append("")
+        
+        try:
+            weatherList.append(weather['uv'])
+        except Exception:
+            weatherList.append("")
+
+        try:
+            weatherList.append(weather['humidity'])
+        except Exception:
+            weatherList.append("")
+        
+        try:
+            weatherList.append(weather['condition']['text'])
+        except Exception:
+            weatherList.append("") 
+
+
+        params = {'key': MTAapiKey}
+        allBusInfo = requests.get(allBusInfoAPI.format(key=MTAapiKey))
         if allBusInfo.status_code == 200:
             allBusInfo = allBusInfo.json()
         else:
+            message = allBusInfo.json()
+            print(message)
             raise Exception("All Bus Info API didn't work") #if this doesnt work then break the whole thing
-
+        
         for item in allBusInfo["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"][0]["VehicleActivity"]:
+
             dataToAdd = []
-            # Process monitored vehicle journey data
             otherData = item['MonitoredVehicleJourney']
             if otherData['PublishedLineName'] != "B52":  # Only interested in B52 line
                 continue
@@ -58,6 +114,8 @@ def dataCollection(filename):
             if allStops.status_code == 200:
                 allStops = allStops.json()
             else:
+                message = allStops.json()
+                print(message)
                 raise Exception("Stop info API didn't work") #if this doesnt work then break the whole thing
 
             try:
@@ -75,72 +133,40 @@ def dataCollection(filename):
             except Exception as e:
                 dataToAdd.append("")
 
-            # Get weather information o
-            weather = requests.get(weatherAPI.format(date=date, time=time, key=weatherAPIKey))
-            if weather.status_code == 200:
-                weather = weather.json()
-            else:
-                raise Exception("Weather API did not work") #if this doesnt work then break the whole thing
+            dataToAdd += weatherList #add weather information. so I only have to call weather API once for every time dataCollection is called.
+
+            try: #late or not
+                aimedArrTime = otherData['MonitoredCall']['AimedArrivalTime']
+                estArrTime = otherData['MonitoredCall']['ExpectedArrivalTime']
+                aimedArrTime = datetime.fromisoformat(aimedArrTime)
+                estArrTime = datetime.fromisoformat(estArrTime)
+                diff = estArrTime - aimedArrTime 
+                minutes = diff.total_seconds() / 60 
             
-            for hour in weather['days'][0]['hours']:
-                if hour['datetime'][:2] == time[0:2]: #if the hour is the same, hourly weather
-                    try:
-                        dataToAdd.append(hour['feelslike'])
-                    except Exception:
-                        dataToAdd.append("")
-                    
-                    try:
-                        dataToAdd.append(hour['visibility'])
-                    except Exception:
-                        dataToAdd.append("")
-                    
-                    try:
-                        dataToAdd.append(hour['windgust'])
-                    except Exception:
-                        dataToAdd.append("")
-                    
-                    try:
-                        dataToAdd.append(hour['precip'])
-                    except Exception:
-                        dataToAdd.append("")
-                    
-                    try:
-                        dataToAdd.append(hour['snow'])
-                    except Exception:
-                        dataToAdd.append("")
-                    
-                    try:
-                        dataToAdd.append(hour['conditions'])
-                    except Exception:
-                        dataToAdd.append("") 
+                if minutes > 5:
+                    dataToAdd.append(1)
 
-                    break #only need to do once
+                else:
+                    dataToAdd.append(0)
+            except:
+                dataToAdd.append("")
 
-            aimedArrTime = otherData['MonitoredCall']['AimedArrivalTime']
-            estArrTime = otherData['MonitoredCall']['ExpectedArrivalTime']
-            aimedArrTime = datetime.fromisoformat(aimedArrTime)
-            estArrTime = datetime.fromisoformat(estArrTime)
-            diff = estArrTime - aimedArrTime 
-            minutes = diff.total_seconds() / 60 
-         
-            if minutes > 5:
-               dataToAdd.append(1)
 
-            else:
-                dataToAdd.append(0)
-
-            # print(dataToAdd)
             with open(filename, mode='a', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(dataToAdd)
 
-            
+
         return 200, "data added to file" 
     except Exception as e:
-        return 400, e
+        error = ['error',traceback.format_exc()]
+        with open(filename, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(error)
+
+        return 200, error #debug, seeing where the error is. change this back to 404 if necessary
 
     
-
 
 
 

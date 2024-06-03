@@ -1,4 +1,4 @@
-
+import traceback
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -24,4 +24,6 @@ def uploadFileToGD(filename, folderID):
 
         return 200, 'done'
     except Exception as e:
-        return 404, e
+        error = traceback.format_exc()
+        return 404, error
+
