@@ -50,31 +50,33 @@ def getFilesFromGD(all, filename=None): #if all is true, then filename is not us
             
         
         for item in items: #iterate through the files and downlaod them
+            try:
+                if item == None: #file already downloaded, dont do it again
+                    continue
 
-            if item == None: #file already downloaded, dont do it again
+                if os.path.isfile(item['name']):   
+                    destination = item['name'] + "_1"
+                else:
+                    destination = item['name']
+                fileID = item['id']
+
+                request = service.files().get_media(fileId=fileID)
+                fh = io.FileIO(destination, 'wb')
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
+                    
+                print(f"{destination} successfully downloaded")
+
+                with open(destination, 'r') as f: #checks to ensure that the things downloaded are okay
+                    reader = csv.reader(f)
+                    row_count = sum(1 for row in reader)
+                    if row_count <= 1: #if the file only has 1 row, its the header and is useless, so delete it
+                        print(f"{destination} does not have enough data, deleted.")
+                        os.remove(destination) 
+            except:
                 continue
-
-            if os.path.isfile(item['name']):   
-                destination = item['name'] + "_1"
-            else:
-                destination = item['name']
-            fileID = item['id']
-
-            request = service.files().get_media(fileId=fileID)
-            fh = io.FileIO(destination, 'wb')
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while done is False:
-                status, done = downloader.next_chunk()
-                
-            print(f"{destination} successfully downloaded")
-
-            with open(destination, 'r') as f: #checks to ensure that the things downloaded are okay
-                reader = csv.reader(f)
-                row_count = sum(1 for row in reader)
-                if row_count <= 1: #if the file only has 1 row, its the header and is useless, so delete it
-                    print(f"{destination} does not have enough data, deleted.")
-                    os.remove(destination) 
 
         return 200, 'all files requested that have data were downloaded'
 

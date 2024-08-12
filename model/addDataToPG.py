@@ -23,6 +23,10 @@ getAllQuery = sql.SQL("SELECT * FROM {table}").format(
         table=sql.Identifier("dailydata")
     )
 
+check_date_query = sql.SQL("""
+            SELECT EXISTS(SELECT 1 FROM dailydata WHERE date = %s)
+        """)
+
 def getAll():
     conn = psycopg2.connect(uriPG)
     cur = conn.cursor()
@@ -83,22 +87,47 @@ def addDataToPG(date, accuracy, features):
         print("Table created successfully")
 
     
-    cur.execute(insertQuery, (date, accuracy, features))
+    cur.execute(check_date_query, (date,))
+    date_exists = cur.fetchone()[0]
+
+    if not date_exists:
+        cur.execute(insertQuery, (date, accuracy, features))
+        conn.commit()
+        print("Data inserted successfully")
+    else:
+        print(f"Data for date {date} already exists. Skipping insertion.")
     
     # Commit the transaction
     conn.commit()
     
     print("Data inserted successfully")
 
-    
-
-
-
-
-
-
-    
     if cur:
         cur.close()
     if conn:
         conn.close()
+
+
+
+def clear_dailyData_table():
+    # conn = None
+    # cur = None
+    # conn = psycopg2.connect(uriPG)
+    # cur = conn.cursor()
+
+    # SQL query to delete all rows from the dailyData table
+    delete_query = sql.SQL("DELETE FROM dailydata")
+
+    # Execute the query
+    cur.execute(delete_query)
+
+    # Commit the transaction
+    conn.commit()
+
+    print("All data has been deleted from the dailyData table.")
+
+    if cur:
+        cur.close()
+    if conn:
+        conn.close()
+

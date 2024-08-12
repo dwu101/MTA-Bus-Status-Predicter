@@ -13,7 +13,7 @@ from sklearn.utils import resample  # Add this import
 from getFilesFromGD import getFilesFromGD
 import os
 
-def mainModel():
+def mainModel(): #shuffle data
 
 
     #get files

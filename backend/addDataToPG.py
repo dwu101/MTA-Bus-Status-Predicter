@@ -23,7 +23,7 @@ getAllQuery = sql.SQL("SELECT * FROM {table}").format(
         table=sql.Identifier("dailydata")
     )
 
-def getAll():
+def getAll(toPrint=True):
     conn = psycopg2.connect(uriPG)
     cur = conn.cursor()
   
@@ -35,19 +35,22 @@ def getAll():
     
     # Get column names
     col_names = [desc[0] for desc in cur.description]
+
+    if toPrint:
     
-    # Print column names
-    print("| " + " | ".join(col_names) + " |")
-    print("|" + "-|"*len(col_names))
-    
-    # Print each row
-    for row in rows:
-        print("| " + " | ".join(str(value) for value in row) + " |")
-    
-    print(f"\nTotal rows: {len(rows)}")
+        # Print column names
+        print("| " + " | ".join(col_names) + " |")
+        print("|" + "-|"*len(col_names))
+        
+        # Print each row
+        for row in rows:
+            print("| " + " | ".join(str(value) for value in row) + " |")
+        
+        print(f"\nTotal rows: {len(rows)}")
 
     cur.close()
     conn.close()
+    return rows, col_names
 
 
 
