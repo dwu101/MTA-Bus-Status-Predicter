@@ -1,4 +1,4 @@
-Developed locally on WSL, posted onto Docker Hub, currently running on an EC2 instance, and stores data on my google drive 
+Developed locally on WSL, posted onto Docker Hub, currently running on an EC2 instance, and stores data on my google drive and Heroku PostgreSQL db
 
 Mostly coded with minecraft parkour videos in my peripheral vision.
 
